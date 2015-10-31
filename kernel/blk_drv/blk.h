@@ -12,6 +12,10 @@
  * buffers when they are in the queue. 64 seems to be too many (easily
  * long pauses in reading when heavy writing/syncing is going on)
  */
+/*
+ * NR_REQUEST 是请求项数组的大小，但为了保证读数据的优先，写操作只能放置在请求项数组的前 2/3，
+ * 而后 1/3 是专门提供给读操作的，当然读操作也可以使用前 2/3。
+ */
 #define NR_REQUEST	32
 
 /*
@@ -42,6 +46,12 @@ struct request {
 ((s1)->dev < (s2)->dev || ((s1)->dev == (s2)->dev && \
 (s1)->sector < (s2)->sector))))
 
+/*
+ * 块设备结构体
+ * request_fn 请求项操作的函数指针，如果是硬盘就是 do_hd_request()，
+ * 如果是软盘，就是 do_floppy_request()
+ * current_request 当前请求项指针，指明本设备目前正在处理的请求项，初始化时被置成 NULL
+*/
 struct blk_dev_struct {
 	void (*request_fn)(void);
 	struct request * current_request;

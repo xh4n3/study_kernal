@@ -17,6 +17,12 @@
  * disk change. This is where it fits best, I think, as it should
  * invalidate changed floppy-disk-caches.
  */
+/*
+ * buffer.c 程序用于对高速缓冲区进行操作和管理，高速缓冲区位于内核代码块和主内存区之间
+ * 整个高速缓冲区被划分成 1024 字节的缓冲块，大小与块设备上逻辑块大小一致
+ * 缓冲区高端是一个个 1024 字节的缓冲块，低端是对应各缓冲块的缓冲头结构 buffer_head，用于描述对应缓冲块的属性，
+ * 并且用于把所有缓冲头连接成一个双向链表结构。
+ */
 
 #include <stdarg.h>
  
@@ -205,6 +211,9 @@ struct buffer_head * get_hash_table(int dev, int block)
  *
  * The algoritm is changed: hopefully better, and an elusive bug removed.
  */
+/*
+ * getblk 是缓冲区搜索管理函数，用于在所有缓冲块中寻找最为空闲的缓冲块
+ */
 #define BADNESS(bh) (((bh)->b_dirt<<1)+(bh)->b_lock)
 struct buffer_head * getblk(int dev,int block)
 {
@@ -267,6 +276,13 @@ void brelse(struct buffer_head * buf)
  * bread() reads a specified block and returns the buffer that contains
  * it. It returns NULL if the block was unreadable.
  */
+/*
+ * 块读取函数 bread
+ * 输入为设备号 dev 和块号 block
+ * bread 会首先在这个设备上是否存在这个块，如果不存在即返回错误
+ * 如果缓存中存在这个块，则直接返回，
+ * 否则调用低级读接口，将返回值写入到缓存中，再返回
+ */
 struct buffer_head * bread(int dev,int block)
 {
 	struct buffer_head * bh;
@@ -295,6 +311,9 @@ __asm__("cld\n\t" \
  * a function of its own, as there is some speed to be got by reading them
  * all at the same time, not waiting for one to be read, and then another
  * etc.
+ */
+/*
+ * 页块读取函数，一次性读取一页内存所能容纳的缓冲块数（4块）
  */
 void bread_page(unsigned long address,int dev,int b[4])
 {

@@ -44,6 +44,9 @@
  * The request-struct contains all necessary data
  * to load a nr of sectors into memory
  */
+/*
+ * 程序载入时设置一个长度为 NR_REQUEST 的请求项数组，此处 NR_REQUEST = 32
+ */
 struct request request[NR_REQUEST];
 
 /*
@@ -55,14 +58,18 @@ struct task_struct * wait_for_request = NULL;
  *	do_request-address
  *	next-request
  */
+/*
+ * 块设备表，每种块设备都在此表中占有一项
+ * NR_BLK_DEV = 7，共七种设备
+ */
 struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
-	{ NULL, NULL },		/* no_dev */
-	{ NULL, NULL },		/* dev mem */
-	{ NULL, NULL },		/* dev fd */
-	{ NULL, NULL },		/* dev hd */
-	{ NULL, NULL },		/* dev ttyx */
-	{ NULL, NULL },		/* dev tty */
-	{ NULL, NULL }		/* dev lp */
+	{ NULL, NULL },		/* no_dev 无 */
+	{ NULL, NULL },		/* dev mem 内存设备 */
+	{ NULL, NULL },		/* dev fd 软驱 */
+	{ NULL, NULL },		/* dev hd 硬盘 */
+	{ NULL, NULL },		/* dev ttyx 虚拟或者串行终端 */
+	{ NULL, NULL },		/* dev tty tty设备 */
+	{ NULL, NULL }		/* dev lp 打印机设备 */
 };
 
 static inline void lock_buffer(struct buffer_head * bh)
@@ -167,11 +174,13 @@ repeat:
 	req->next = NULL;
 	add_request(major+blk_dev,req);
 }
-
+/*
+ * rw 标记了 READ=0, WRITE=1, READA=2, WRITEA=3
+ */
 void ll_rw_block(int rw, struct buffer_head * bh)
 {
 	unsigned int major;
-
+	// 如果设备的主设备号不存在或者该设备的请求操作函数不存在，就报错
 	if ((major=MAJOR(bh->b_dev)) >= NR_BLK_DEV ||
 	!(blk_dev[major].request_fn)) {
 		printk("Trying to read nonexistent block-device\n\r");
@@ -180,6 +189,11 @@ void ll_rw_block(int rw, struct buffer_head * bh)
 	make_request(major,rw,bh);
 }
 
+/*
+ * 在内核初始化时，init/main.c 程序调用了该函数，用于初始化所有块设备。
+ * dev 为使用的设备号，-1 代表空闲
+ * next 指向下一请求项，初始化为 NULL
+ */
 void blk_dev_init(void)
 {
 	int i;
