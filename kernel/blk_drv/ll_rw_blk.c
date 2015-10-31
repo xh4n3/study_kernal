@@ -180,7 +180,13 @@ repeat:
 void ll_rw_block(int rw, struct buffer_head * bh)
 {
 	unsigned int major;
-	// 如果设备的主设备号不存在或者该设备的请求操作函数不存在，就报错
+	/*
+	 * 如果设备的主设备号不存在或者该设备的请求操作函数不存在，就报错
+	 * 设备号 = 主设备号 * 256 + 次设备号
+	 * dev_no = (major << 8) + minor
+	 * 第一块硬盘的逻辑设备号为 0x300,
+	 * int('0x300', 16) >> 8 == 3，此处 3 即为 major，主设备号，与 blk_dev 中位置一样
+	*/
 	if ((major=MAJOR(bh->b_dev)) >= NR_BLK_DEV ||
 	!(blk_dev[major].request_fn)) {
 		printk("Trying to read nonexistent block-device\n\r");
