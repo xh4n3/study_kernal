@@ -72,6 +72,14 @@ struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
 	{ NULL, NULL }		/* dev lp 打印机设备 */
 };
 
+
+/*
+ * 锁定缓冲区块 bh
+ * 如果该缓冲区块已经被其他任务锁定，则睡眠，知道被唤醒，然后给该缓冲区加锁
+ * 代码前使用 cli 调用了汇编中的 cli 指令，用于禁止中断发生，包括硬件中断
+ * 代码后使用了 stl，允许中断发生，
+ * 这两个指令都只能在内核模式下执行，用于完成原子操作
+ */
 static inline void lock_buffer(struct buffer_head * bh)
 {
 	cli();
@@ -118,6 +126,9 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 	sti();
 }
 
+/*
+ * 新建一个请求项，输入为主设备号，读写操作符和缓冲头
+ */
 static void make_request(int major,int rw, struct buffer_head * bh)
 {
 	struct request * req;
@@ -181,7 +192,7 @@ void ll_rw_block(int rw, struct buffer_head * bh)
 {
 	unsigned int major;
 	/*
-	 * 如果设备的主设备号不存在或者该设备的请求操作函数不存在，就报错
+	 * 如果设备的主设备号不存在或者该设备的请求操作函数不存在，就报错，否则就建立一个请求项
 	 * 设备号 = 主设备号 * 256 + 次设备号
 	 * dev_no = (major << 8) + minor
 	 * 第一块硬盘的逻辑设备号为 0x300,
