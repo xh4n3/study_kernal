@@ -160,6 +160,15 @@ void sleep_on(struct task_struct **p)
 	*p = current;
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule();
+	/*
+	 * sleep_on 的过程
+	 * A 把资源锁住，
+	 * B 作为 b_wait 第一个，
+	 * C 也进入了，
+	 * A 唤醒 C，
+	 * C 唤醒 B。
+	 * 所以模拟了一个队列。
+	 */
 	if (tmp)
 		tmp->state=0;
 }
