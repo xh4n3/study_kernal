@@ -193,15 +193,19 @@ int sys_creat(const char * pathname, int mode)
 int sys_close(unsigned int fd)
 {	
 	struct file * filp;
-
+	// 如果 fd 超出了进程所能打开文件最大数，则报错
 	if (fd >= NR_OPEN)
 		return -EINVAL;
+	// close_on_exec 是一个位图，置 1 时代表进程调用 execve() 时该文件句柄会被关闭
+	// TODO execve 暂且不知其作用
 	current->close_on_exec &= ~(1<<fd);
 	if (!(filp = current->filp[fd]))
 		return -EINVAL;
 	current->filp[fd] = NULL;
+	// 如果本身引用计数为 0，则报错
 	if (filp->f_count == 0)
 		panic("Close: file count is 0");
+	// 给引用计数减少 1，如果还大于 0，则直接返回
 	if (--filp->f_count)
 		return (0);
 	iput(filp->f_inode);

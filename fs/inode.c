@@ -151,9 +151,11 @@ void iput(struct m_inode * inode)
 {
 	if (!inode)
 		return;
+	// 等待 inode 解锁
 	wait_on_inode(inode);
 	if (!inode->i_count)
 		panic("iput: trying to free free inode");
+	// 如果是管道，唤醒等待的进程
 	if (inode->i_pipe) {
 		wake_up(&inode->i_wait);
 		if (--inode->i_count)

@@ -46,7 +46,7 @@ static inline int send_sig(long sig,struct task_struct * p,int priv)
 static void kill_session(void)
 {
 	struct task_struct **p = NR_TASKS + task;
-	
+	// 循环所有进程，给 session 一致的所有进程发送 SIGHUP
 	while (--p > &FIRST_TASK) {
 		if (*p && (*p)->session == current->session)
 			(*p)->signal |= 1<<(SIGHUP-1);
@@ -83,7 +83,7 @@ int sys_kill(int pid,int sig)
 static void tell_father(int pid)
 {
 	int i;
-
+	// 循环所有进程，给父进程 pid 发送 SIGCHLD 信号
 	if (pid)
 		for (i=0;i<NR_TASKS;i++) {
 			if (!task[i])
@@ -95,40 +95,63 @@ static void tell_father(int pid)
 		}
 /* if we don't find any fathers, we just release ourselves */
 /* This is not really OK. Must change it to make father 1 */
+	// 如果实在找不到父进程，就把自己的进程释放了
 	printk("BAD BAD - no father found\n\r");
+	// 把自己从进程列表 task 中删除，并且调用 schedule()
 	release(current);
 }
 
 int do_exit(long code)
 {
 	int i;
+	// TODO 待看页表
 	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
 	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
+	/*
+	 * 找出所有子进程，将它们的父亲设为 init 进程，将状态标记为僵尸
+	 * 然后给 init 进程发送一个 SIGCHLD 信号，提醒 init 进程回收子进程
+	 */
 	for (i=0 ; i<NR_TASKS ; i++)
 		if (task[i] && task[i]->father == current->pid) {
 			task[i]->father = 1;
 			if (task[i]->state == TASK_ZOMBIE)
 				/* assumption task[1] is always init */
+				// 最后一个参数 1 代表 privilege，此处为强制发送
 				(void) send_sig(SIGCHLD, task[1], 1);
 		}
+	// TODO 关闭文件？
+	/*
+	 * NR_OPEN 是一个进程可以打开的最大文件数
+	 * 而 NR_FILE 是系统在某时刻的限制文件总数
+	 */
 	for (i=0 ; i<NR_OPEN ; i++)
 		if (current->filp[i])
 			sys_close(i);
+	// 进程的当前工作目录 inode
 	iput(current->pwd);
 	current->pwd=NULL;
+	// 进程的根目录 inode
 	iput(current->root);
 	current->root=NULL;
+	// 进程本身可执行文件的 inode
 	iput(current->executable);
 	current->executable=NULL;
 	if (current->leader && current->tty >= 0)
 		tty_table[current->tty].pgrp = 0;
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
+	/*
+	 * 如果是 session leader 会话领头进程，则向该会话所有进程发送 SIGHUP 信号
+	 * PID, PPID, PGID, SID
+	 * http://unix.stackexchange.com/questions/18166/what-are-session-leaders-in-ps
+	 */
 	if (current->leader)
 		kill_session();
+	// 将自己设为僵尸，设置退出状态码，同时告诉父进程回收子进程
 	current->state = TASK_ZOMBIE;
 	current->exit_code = code;
 	tell_father(current->father);
+	// 如果 tell_father 中找不到父进程，自己把自己释放掉了，那也不会有机会继续执行下面代码了
 	schedule();
 	return (-1);	/* just to suppress warnings */
 }

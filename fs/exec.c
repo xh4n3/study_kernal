@@ -321,6 +321,7 @@ restart_interp:
 	current->executable = inode;
 	for (i=0 ; i<32 ; i++)
 		current->sigaction[i].sa_handler = NULL;
+	// TODO 可能是在说，当程序退出时，把打开过的文件一个一个关闭
 	for (i=0 ; i<NR_OPEN ; i++)
 		if ((current->close_on_exec>>i)&1)
 			sys_close(i);

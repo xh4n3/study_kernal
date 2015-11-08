@@ -79,6 +79,10 @@ int sys_sigaction(int signum, const struct sigaction * action,
 	return 0;
 }
 
+/*
+ * 在 system_call.s 的 ret_from_sys_call 中调用
+ * 即有信号产生时，信号接收进程会执行以下操作
+ */
 void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 	long fs, long es, long ds,
 	long eip, long cs, long eflags,
@@ -91,14 +95,21 @@ void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 	unsigned long * tmp_esp;
 
 	sa_handler = (unsigned long) sa->sa_handler;
+	// 此处 1 为 SIG_IGN, 即为一个忽略的信号，直接返回
 	if (sa_handler==1)
 		return;
+	/*
+	 * sa_handler 为 0 时意为 SIG_DFL，默认处理句柄
+	 * 如果信号为 SIGCHLD，直接返回
+	 * 否则以信号为参数调用 do_exit
+	 */
 	if (!sa_handler) {
 		if (signr==SIGCHLD)
 			return;
 		else
 			do_exit(1<<(signr-1));
 	}
+	// 如果 sa_flags 中设置了一次性标记，那么就将 handler 标记为 NULL
 	if (sa->sa_flags & SA_ONESHOT)
 		sa->sa_handler = NULL;
 	*(&eip) = sa_handler;
