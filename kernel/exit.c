@@ -144,6 +144,11 @@ int do_exit(long code)
 	 * 如果是 session leader 会话领头进程，则向该会话所有进程发送 SIGHUP 信号
 	 * PID, PPID, PGID, SID
 	 * http://unix.stackexchange.com/questions/18166/what-are-session-leaders-in-ps
+	 * 在同一次 ssh 会话中，用户对应的 shell 最先被启动，成为 session leader，
+	 * 所有在同一次会话中产生的进程 session id 都等于这个 session leader 的 pid
+	 * 当 session leader 退出时，它会向所有同一 session 中的进程发送 SIGHUP，
+	 * 这个信号是可以被捕获的，如果进程忽略这个 SIGHUP，它则可以以一个孤儿进程继续执行
+	 * http://www.firefoxbug.com/index.php/archives/2782/
 	 */
 	if (current->leader)
 		kill_session();
