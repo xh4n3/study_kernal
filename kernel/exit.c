@@ -61,19 +61,26 @@ int sys_kill(int pid,int sig)
 {
 	struct task_struct **p = NR_TASKS + task;
 	int err, retval = 0;
-
+	// (*p)->pgrp == current->pid 说明 p 为 current 本身或者由 current 启动的进程组中进程之一
+	// pid = 0 时强制给自身或者由自身引领的一系列进程发送该信号
+	// Shell 中一条管道命令，如果是 ps | cat，cat 的 pgrp 就等于 ps 的 pid，它们同属一个进程组
 	if (!pid) while (--p > &FIRST_TASK) {
 		if (*p && (*p)->pgrp == current->pid) 
 			if ((err=send_sig(sig,*p,1)))
 				retval = err;
 	} else if (pid>0) while (--p > &FIRST_TASK) {
+		// pid > 0 时给 pid 指定的进程发送信号，此处会检查进程有效用户是否与当前进程有效用户一致，或者是否 root
 		if (*p && (*p)->pid == pid) 
 			if ((err=send_sig(sig,*p,0)))
 				retval = err;
 	} else if (pid == -1) while (--p > &FIRST_TASK) {
+			// pid == -1 时，给所有进程发送信号
+			// If superuser, broadcast the signal to all processes;
+			// otherwise broadcast to all processes belonging to the user.
 		if ((err = send_sig(sig,*p,0)))
 			retval = err;
 	} else while (--p > &FIRST_TASK)
+			// pid 为除 -1 以外负值时，给绝对值满足 pid 的发送信号，此时为非强制性发送
 		if (*p && (*p)->pgrp == -pid)
 			if ((err = send_sig(sig,*p,0)))
 				retval = err;
@@ -170,37 +177,49 @@ int sys_waitpid(pid_t pid,unsigned long * stat_addr, int options)
 {
 	int flag, code;
 	struct task_struct ** p;
-
+	// TODO
 	verify_area(stat_addr,4);
 repeat:
 	flag=0;
 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p) {
+		// p 空或者为本进程则跳过
 		if (!*p || *p == current)
 			continue;
+		// 非本进程的子进程也跳过
 		if ((*p)->father != current->pid)
 			continue;
+		// 当 pid 大于 0 时，说明明确等待某一子进程，则跳过不匹配的子进程
 		if (pid>0) {
 			if ((*p)->pid != pid)
 				continue;
+		// 如果 pid 等于 0， 则等待同进程组，所以跳过非同组的
 		} else if (!pid) {
 			if ((*p)->pgrp != current->pgrp)
 				continue;
+		// 等待绝对值
 		} else if (pid != -1) {
 			if ((*p)->pgrp != -pid)
 				continue;
 		}
+		// 如果 pid = -1，则等待任何子进程
 		switch ((*p)->state) {
+			// TODO
 			case TASK_STOPPED:
 				if (!(options & WUNTRACED))
 					continue;
 				put_fs_long(0x7f,stat_addr);
 				return (*p)->pid;
 			case TASK_ZOMBIE:
+				//  如果为僵尸进程，将子进程的用户态滴答数加到该进程用户态滴答数中
 				current->cutime += (*p)->utime;
+				// 内核态滴答数也要加上
 				current->cstime += (*p)->stime;
+				// 将该进程 pid 返回
 				flag = (*p)->pid;
 				code = (*p)->exit_code;
+				// 释放该进程
 				release(*p);
+				// TODO 不知道这个是什么意思
 				put_fs_long(code,stat_addr);
 				return flag;
 			default:
