@@ -110,12 +110,15 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 	cli();
 	if (req->bh)
 		req->bh->b_dirt = 0;
+	// 如果当前没有请求，直接运行 request_fn
 	if (!(tmp = dev->current_request)) {
 		dev->current_request = req;
 		sti();
+		// 调用设备的请求处理函数 对应块设备的 do_hd_request
 		(dev->request_fn)();
 		return;
 	}
+	// TODO 电梯算法：读优先，根据扇区号，设备号排序
 	for ( ; tmp->next ; tmp=tmp->next)
 		if ((IN_ORDER(tmp,req) || 
 		    !IN_ORDER(tmp,tmp->next)) &&

@@ -113,11 +113,17 @@ static inline void unlock_buffer(struct buffer_head * bh)
 	if (!bh->b_lock)
 		printk(DEVICE_NAME ": free buffer being unlocked\n");
 	bh->b_lock=0;
+	// 唤醒等待队列上的第一个
 	wake_up(&bh->b_wait);
 }
 
 static inline void end_request(int uptodate)
 {
+	/*
+	 * 此处 CURRENT 是指目前的读写请求
+	 * 这个函数是在终止这个请求
+	 */
+
 	DEVICE_OFF(CURRENT->dev);
 	if (CURRENT->bh) {
 		CURRENT->bh->b_uptodate = uptodate;

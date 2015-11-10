@@ -247,6 +247,7 @@ static void bad_rw_intr(void)
 		reset = 1;
 }
 
+// 异步回调
 static void read_intr(void)
 {
 	if (win_result()) {
@@ -262,6 +263,7 @@ static void read_intr(void)
 		do_hd = &read_intr;
 		return;
 	}
+	// 因为回调已经成功，所以调用 end_request 关闭请求
 	end_request(1);
 	do_hd_request();
 }
@@ -291,6 +293,7 @@ static void recal_intr(void)
 	do_hd_request();
 }
 
+// 处理请求队列里面所有请求
 void do_hd_request(void)
 {
 	int i,r = 0;
@@ -335,6 +338,7 @@ void do_hd_request(void)
 		}
 		port_write(HD_DATA,CURRENT->buffer,256);
 	} else if (CURRENT->cmd == READ) {
+		// 设置回调函数 read_intr 直接返回
 		hd_out(dev,nsect,sec,head,cyl,WIN_READ,&read_intr);
 	} else
 		panic("unknown hd-command");

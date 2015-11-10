@@ -107,13 +107,17 @@ void schedule(void)
 	struct task_struct ** p;
 
 /* check alarm, wake up any interruptible tasks that have got a signal */
-
+	// jiffies 是系统开机开始算起的滴答数 默认 10ms 一滴答
+	// 检查报警定时值 alarm，如果有进程的 alarm 已经过期，则给进程设置 SIGALRM
+	// 同时重置 alarm
 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
 		if (*p) {
 			if ((*p)->alarm && (*p)->alarm < jiffies) {
 					(*p)->signal |= (1<<(SIGALRM-1));
 					(*p)->alarm = 0;
 				}
+			// 如果信号中除去可以被阻塞的信号还有别的信号并且进程是可中断的睡眠状态
+			// 则标记该进程为就绪状态
 			if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
 			(*p)->state==TASK_INTERRUPTIBLE)
 				(*p)->state=TASK_RUNNING;
@@ -129,18 +133,26 @@ void schedule(void)
 		while (--i) {
 			if (!*--p)
 				continue;
+			// 依次循环所有就绪进程，找出剩余时间片最大的进程
 			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
 				c = (*p)->counter, next = i;
 		}
+		// 如果找到最大时间片非零，则直接调度给这个进程
 		if (c) break;
 		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
+			// 当没有进程有有效时间片时，开始按照优先级给所有进程分配时间片
 			if (*p)
+				// TODO
 				(*p)->counter = ((*p)->counter >> 1) +
 						(*p)->priority;
 	}
+	// 如果重新分配时间片，这里 next 为 0，而 0 是一个空闲 idle 进程
+	// 会调用 pause() 将自己设置为可中断状态并调用 schedule()
+
 	switch_to(next);
 }
 
+// 将自己设置为可中断状态，然后调用 schedule()
 int sys_pause(void)
 {
 	current->state = TASK_INTERRUPTIBLE;
@@ -161,6 +173,18 @@ void sleep_on(struct task_struct **p)
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule();
 	/*
+	 * 假设 A 进程现在占有某资源，B 进程进入 sleep_on 等待资源
+	 * C 进程同样等待，随后进入
+	 * ---
+	 * B 进程中：
+	 * schedule 前，tmp 为空队列指针，然后把队列头赋值为自己
+	 * C 进程中，
+	 * schedule 前，tmp 为队列头 B 进程，然后把队列头赋值为自己
+	 * ---
+	 * schedule 后：读写数据完成，unlock_buffer 会将队列头唤醒
+	 * 此处即唤醒 C 进程，而 C 进程是将 tmp 进程设为 TASK_RUNNING，
+	 * 其实是唤醒了 B 进程, B 进程先来后到理所当然
+	 * TODO
 	 * sleep_on 的过程
 	 * A 把资源锁住，
 	 * B 作为 b_wait 第一个，
@@ -170,6 +194,7 @@ void sleep_on(struct task_struct **p)
 	 * 所以模拟了一个队列。
 	 */
 	if (tmp)
+		// TASK_RUNNING = 0
 		tmp->state=0;
 }
 
