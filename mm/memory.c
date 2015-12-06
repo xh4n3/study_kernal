@@ -157,6 +157,8 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 
 	if ((from&0x3fffff) || (to&0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
+	// 为了取得地址：先右移 22，后左移 2 位
+	// 或者 右移 20 位
 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
 	size = ((unsigned) (size+0x3fffff)) >> 22;
